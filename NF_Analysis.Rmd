@@ -1,0 +1,2731 @@
+---
+title: "NF_Analysis"
+author: "Helly"
+date: "2026-08-23"
+output: html_document
+---
+
+
+
+
+# Song-level Acoustic Analysis
+
+```{r}
+library(readr)
+Song_Level_Data <- read_csv("Song_Level_Data.csv")
+View(Song_Level_Data)
+
+
+colnames(Song_Level_Data)
+
+library(readr)
+library(dplyr)
+
+# Load song-level dataset
+
+Song_Level_Data <- read_csv("Song_Level_Data.csv")
+
+
+# Wilcoxon tests
+
+
+wilcox_results <- data.frame(
+  
+  Feature = c(
+    "Minimum frequency",
+    "Maximum frequency",
+    "Frequency bandwidth",
+    "Mean centre frequency",
+    "Peak frequency",
+    "Duration",
+    "Note count",
+    "Note pace"
+  ),
+  
+  W = c(
+    wilcox.test(Low.Freq..Hz. ~ Sex, data = Song_Level_Data)$statistic,
+    wilcox.test(High.Freq..Hz. ~ Sex, data = Song_Level_Data)$statistic,
+    wilcox.test(Delta.Freq..Hz. ~ Sex, data = Song_Level_Data)$statistic,
+    wilcox.test(Mean.Freq..Hz. ~ Sex, data = Song_Level_Data)$statistic,
+    wilcox.test(Peak.Freq..Hz. ~ Sex, data = Song_Level_Data)$statistic,
+    wilcox.test(Delta.Time..s. ~ Sex, data = Song_Level_Data)$statistic,
+    wilcox.test(Note_Count ~ Sex, data = Song_Level_Data)$statistic,
+    wilcox.test(Note_Pace ~ Sex, data = Song_Level_Data)$statistic
+  ),
+  
+  p_value = c(
+    wilcox.test(Low.Freq..Hz. ~ Sex, data = Song_Level_Data)$p.value,
+    wilcox.test(High.Freq..Hz. ~ Sex, data = Song_Level_Data)$p.value,
+    wilcox.test(Delta.Freq..Hz. ~ Sex, data = Song_Level_Data)$p.value,
+    wilcox.test(Mean.Freq..Hz. ~ Sex, data = Song_Level_Data)$p.value,
+    wilcox.test(Peak.Freq..Hz. ~ Sex, data = Song_Level_Data)$p.value,
+    wilcox.test(Delta.Time..s. ~ Sex, data = Song_Level_Data)$p.value,
+    wilcox.test(Note_Count ~ Sex, data = Song_Level_Data)$p.value,
+    wilcox.test(Note_Pace ~ Sex, data = Song_Level_Data)$p.value
+  )
+)
+
+wilcox_results$p_value <- signif(wilcox_results$p_value, 4)
+
+print(wilcox_results)
+
+write.csv(
+  wilcox_results,
+  "Song_Level_Wilcoxon_Results.csv", row.names = FALSE)
+
+
+
+
+
+# SONG-LEVEL ACOUSTIC ANALYSIS
+# Box/Violin plots + Wilcoxon rank-sum tests
+
+
+
+# 1. Load packages
+
+
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+
+
+# 2. Load song-level dataset
+
+
+Song_Level_Data <- read_csv("Song_Level_Data.csv")
+View(Song_Level_Data)
+colnames(Song_Level_Data)
+
+
+
+# 3. Select and rename acoustic variables
+
+
+df_plot <- Song_Level_Data %>%
+  select(
+    Sex,
+    Low.Freq..Hz.,
+    High.Freq..Hz.,
+    Delta.Freq..Hz.,
+    Mean.Freq..Hz.,
+    Peak.Freq..Hz.,
+    Delta.Time..s.,
+    Note_Count,
+    Note_Pace
+  ) %>%
+  na.omit() %>%
+  rename(
+    "Minimum frequency (Hz)" = Low.Freq..Hz.,
+    "Maximum frequency (Hz)" = High.Freq..Hz.,
+    "Frequency bandwidth (Hz)" = Delta.Freq..Hz.,
+    "Mean centre frequency (Hz)" = Mean.Freq..Hz.,
+    "Peak frequency (Hz)" = Peak.Freq..Hz.,
+    "Duration (s)" = Delta.Time..s.,
+    "Note count" = Note_Count,
+    "Note pace" = Note_Pace
+  )
+
+
+
+# 4. Convert to long format
+
+
+long_df <- df_plot %>%
+  pivot_longer(
+    cols = -Sex,
+    names_to = "Feature",
+    values_to = "Value"
+  )
+
+
+
+# 5. Set exact order of acoustic variables
+
+
+long_df$Feature <- factor(
+  long_df$Feature,
+  levels = c(
+    "Minimum frequency (Hz)",
+    "Maximum frequency (Hz)",
+    "Frequency bandwidth (Hz)",
+    "Mean centre frequency (Hz)",
+    "Peak frequency (Hz)",
+    "Duration (s)",
+    "Note count",
+    "Note pace"
+  )
+)
+
+
+
+# 6. Wilcoxon rank-sum test for all variables
+
+
+wilcox_results <- long_df %>%
+  group_by(Feature) %>%
+  summarise(
+    W = as.numeric(
+      wilcox.test(Value ~ Sex)$statistic
+    ),
+    p_value = wilcox.test(Value ~ Sex)$p.value,
+    .groups = "drop"
+  )
+
+# View results
+print(wilcox_results)
+
+
+# 7. Save Wilcoxon results
+
+
+write.csv(
+  wilcox_results,
+  "Song_Level_Wilcoxon_Results.csv",
+  row.names = FALSE
+)
+
+
+# 8. Prepare p-value labels for figure
+
+
+pvals <- long_df %>%
+  group_by(Feature) %>%
+  summarise(
+    W = as.numeric(
+      wilcox.test(Value ~ Sex)$statistic
+    ),
+    p_value = wilcox.test(Value ~ Sex)$p.value,
+    ymax = max(Value, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    label = ifelse(
+      p_value < 0.001,
+      "p < 0.001",
+      paste0("p = ", signif(p_value, 3))
+    )
+  )
+
+
+# Check p-value labels
+print(pvals)
+
+
+# 9. Create violin + box plots
+
+
+p <- ggplot(
+  long_df,
+  aes(
+    x = Sex,
+    y = Value,
+    fill = Sex,
+    color = Sex
+  )
+) +
+  
+  # Violin
+  geom_violin(
+    trim = FALSE,
+    alpha = 0.4,
+    linewidth = 1.0
+  ) +
+  
+  # Box plot
+  geom_boxplot(
+    width = 0.15,
+    fill = "white",
+    color = "black",
+    outlier.shape = NA
+  ) +
+  
+  # Arrange panels in requested order
+  facet_wrap(
+    ~ Feature,
+    scales = "free_y",
+    ncol = 3
+  ) +
+  
+  # Colours
+  scale_fill_manual(
+    values = c(
+      "Female" = "#F4A6A6",
+      "Male" = "#87CEEB"
+    )
+  ) +
+  
+  scale_color_manual(
+    values = c(
+      "Female" = "#E07B7B",
+      "Male" = "#5DAEDB"
+    )
+  ) +
+  
+  # Labels
+  labs(
+    title = "Sex-based Differences in Song-level Acoustic Features",
+    x = "Sex",
+    y = "Acoustic feature value"
+  ) +
+  
+  # Theme
+  theme_bw(base_size = 13) +
+  
+  theme(
+    legend.position = "none",
+    
+    panel.border = element_rect(
+      color = "black",
+      fill = NA,
+      linewidth = 1
+    ),
+    
+    strip.background = element_rect(
+      fill = "white",
+      color = "black"
+    ),
+    
+    strip.text = element_text(
+      face = "bold",
+      size = 13
+    ),
+    
+    axis.title = element_text(
+      face = "bold"
+    ),
+    
+    axis.text = element_text(
+      color = "black"
+    ),
+    
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold",
+      size = 16
+    )
+  )
+
+
+
+# 10. Add p-values
+
+
+p_final <- p +
+  geom_text(
+    data = pvals,
+    aes(
+      x = 1.5,
+      y = ymax * 1.08,
+      label = label
+    ),
+    inherit.aes = FALSE,
+    size = 4,
+    fontface = "bold"
+  )
+
+
+# 11. Display final figure
+
+
+print(p_final)
+
+
+
+# 12. Save high-resolution figure
+
+
+ggsave(
+  "Song_Level_Acoustic_Parameters_Boxplot.jpg",
+  p_final,
+  width = 12,
+  height = 9,
+  dpi = 600
+)
+```
+
+
+# PCA: Song-level Acoustic Features
+
+```{r}
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+
+# Prepare PCA data
+
+
+Song_Level_Data <- read_csv("Song_Level_Data.csv")
+
+pca_data <- Song_Level_Data %>%
+  select(
+    Sex,
+    `Low.Freq..Hz.`,
+    `High.Freq..Hz.`,
+    `Delta.Freq..Hz.`,
+    `Mean.Freq..Hz.`,
+    `Peak.Freq..Hz.`,
+    `Delta.Time..s.`,
+    Note_Count,
+    Note_Pace
+  ) %>%
+  na.omit()
+
+# Keep sex labels
+sex_labels <- pca_data$Sex
+
+# Acoustic features only
+pca_features <- pca_data %>%
+  select(-Sex)
+
+# Rename variables for clarity
+colnames(pca_features) <- c(
+  "Lowest_Frequency",
+  "Highest_Frequency",
+  "Frequency_Bandwidth",
+  "Mean_Centre_Frequency",
+  "Peak_Frequency",
+  "Song_Duration",
+  "Note_Count",
+  "Note_Pace"
+)
+
+
+# Run PCA
+
+
+pca_res <- prcomp(
+  pca_features,
+  center = TRUE,
+  scale. = TRUE
+)
+
+
+# Variance explained
+
+
+var_explained <- round(
+  100 * summary(pca_res)$importance[2, 1:2],
+  1
+)
+
+print(var_explained)
+
+
+# PCA scores
+
+
+pca_scores <- as.data.frame(pca_res$x)
+
+pca_scores$Sex <- sex_labels
+
+
+# Calculate centroids
+
+
+centroids <- pca_scores %>%
+  group_by(Sex) %>%
+  summarise(
+    PC1 = mean(PC1),
+    PC2 = mean(PC2),
+    .groups = "drop"
+  )
+
+# Check centroid values
+print(centroids)
+
+
+# PCA Plot
+
+
+p_pca <- ggplot(
+  pca_scores,
+  aes(
+    x = PC1,
+    y = PC2,
+    colour = Sex,
+    fill = Sex
+  )
+) +
+  
+  # Points
+  geom_point(
+    size = 2.5,
+    alpha = 0.6
+  ) +
+  
+  # 95% confidence ellipses
+  stat_ellipse(
+    type = "norm",
+    level = 0.95,
+    geom = "polygon",
+    alpha = 0.20,
+    linewidth = 1.2
+  ) +
+  
+  # Centroids
+  geom_point(
+    data = centroids,
+    aes(
+      x = PC1,
+      y = PC2,
+      colour = Sex
+    ),
+    shape = 4,
+    size = 6,
+    stroke = 2.5,
+    show.legend = FALSE
+  ) +
+  
+  # Colours
+  scale_colour_manual(
+    values = c(
+      Female = "#E07B7B",
+      Male = "#5DAEDB"
+    )
+  ) +
+  
+  scale_fill_manual(
+    values = c(
+      Female = "#F4A6A6",
+      Male = "#87CEEB"
+    )
+  ) +
+  
+  # Labels
+  labs(
+    title = "PCA of Song-level Acoustic Features",
+    x = paste0(
+      "PC1 (", var_explained[1], "%)"
+    ),
+    y = paste0(
+      "PC2 (", var_explained[2], "%)"
+    ),
+    colour = NULL,
+    fill = NULL
+  ) +
+  
+  # Theme
+  theme_bw(base_size = 14) +
+  
+  theme(
+    panel.border = element_rect(
+      colour = "black",
+      fill = NA,
+      linewidth = 1
+    ),
+    
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold",
+      size = 18
+    ),
+    
+    axis.title = element_text(
+      face = "bold"
+    ),
+    
+    axis.text = element_text(
+      colour = "black"
+    ),
+    
+    legend.title = element_blank(),
+    
+    legend.position = "right"
+  )
+
+
+# plot
+
+
+print(p_pca)
+
+
+# Save figures
+
+
+ggsave(
+  filename = "F:/IISER Tirupati/NF-BirdNet/NF-Plots/PCA/PCA_Song_Level_Centroids.png",
+  plot = p_pca,
+  width = 8,
+  height = 6,
+  dpi = 800,
+  bg = "white"
+)
+
+ggsave(
+  filename = "F:/IISER Tirupati/NF-BirdNet/NF-Plots/PCA/PCA_Song_Level_Centroids.tiff",
+  plot = p_pca,
+  width = 8,
+  height = 6,
+  dpi = 600,
+  compression = "lzw",
+  bg = "white"
+)
+```
+
+
+
+
+# PCA Biplot: Song-level Acoustic Features
+
+```{r}
+library(ggrepel)
+library(grid)
+
+# Scores
+scores <- as.data.frame(
+  pca_res$x[, 1:2]
+)
+
+scores$Sex <- sex_labels
+
+
+# Loadings
+loadings <- as.data.frame(
+  pca_res$rotation[, 1:2]
+)
+
+loadings$Variable <- rownames(loadings)
+
+
+
+# Scale loading arrows to fit PCA scores
+
+
+mult <- min(
+  (max(scores$PC1) - min(scores$PC1)) /
+    (max(loadings$PC1) - min(loadings$PC1)),
+  
+  (max(scores$PC2) - min(scores$PC2)) /
+    (max(loadings$PC2) - min(loadings$PC2))
+)
+
+mult <- mult * 0.70
+
+
+
+# Biplot
+
+
+p_biplot <- ggplot(
+  scores,
+  aes(
+    x = PC1,
+    y = PC2
+  )
+) +
+  
+  # Individual songs
+  geom_point(
+    aes(colour = Sex),
+    size = 2.8,
+    alpha = 0.65
+  ) +
+  
+  # 95% confidence ellipses
+  stat_ellipse(
+    aes(colour = Sex),
+    type = "norm",
+    level = 0.95,
+    linewidth = 1
+  ) +
+  
+  # Loading arrows
+  geom_segment(
+    data = loadings,
+    aes(
+      x = 0,
+      y = 0,
+      xend = PC1 * mult,
+      yend = PC2 * mult
+    ),
+    inherit.aes = FALSE,
+    colour = "purple4",
+    linewidth = 0.8,
+    arrow = arrow(
+      length = unit(0.25, "cm")
+    )
+  ) +
+  
+  # Loading labels
+  geom_text_repel(
+    data = loadings,
+    aes(
+      x = PC1 * mult,
+      y = PC2 * mult,
+      label = Variable
+    ),
+    inherit.aes = FALSE,
+    colour = "navy",
+    fontface = "bold",
+    size = 4,
+    box.padding = 0.6,
+    point.padding = 0.3,
+    segment.color = "grey50",
+    segment.size = 0.4,
+    max.overlaps = Inf
+  ) +
+  
+  # Colours
+  scale_colour_manual(
+    values = c(
+      "Female" = "#E07B7B",
+      "Male" = "#5DAEDB"
+    )
+  ) +
+  
+  labs(
+    title = "PCA Biplot of Song-level",
+    
+    x = paste0(
+      "PC1 (",
+      var_explained[1],
+      "%)"
+    ),
+    
+    y = paste0(
+      "PC2 (",
+      var_explained[2],
+      "%)"
+    ),
+    
+    colour = NULL
+  ) +
+  
+  theme_bw(base_size = 14) +
+  
+  theme(
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold",
+      size = 18
+    ),
+    
+    panel.border = element_rect(
+      colour = "black",
+      fill = NA,
+      linewidth = 1
+    ),
+    
+    axis.title = element_text(
+      face = "bold"
+    ),
+    
+    axis.text = element_text(
+      colour = "black"
+    ),
+    
+    legend.title = element_blank()
+  )
+
+
+# Display
+print(p_biplot)
+
+
+# Save
+ggsave(
+  filename =
+    "F:/IISER Tirupati/NF-BirdNet/NF-Plots/PCA/PCA_Biplot_Song_Level.png",
+  plot = p_biplot,
+  width = 8,
+  height = 6,
+  dpi = 800,
+  bg = "white"
+)
+
+ggsave(
+  filename =
+    "F:/IISER Tirupati/NF-BirdNet/NF-Plots/PCA/PCA_Biplot_Song_Level.tiff",
+  plot = p_biplot,
+  width = 8,
+  height = 6,
+  dpi = 600,
+  compression = "lzw",
+  bg = "white"
+)
+```
+
+## PC2 vs PC3
+
+```{r PCA-song-PC2-PC3}
+
+# Variance explained
+
+var_explained <- round(
+  100 * summary(pca_res)$importance[2, 1:3],
+  1
+)
+
+print(var_explained)
+
+
+# PCA scores
+
+pca_scores <- as.data.frame(pca_res$x)
+pca_scores$Sex <- sex_labels
+
+
+# Calculate centroids for PC2 and PC3
+
+centroids_PC23 <- pca_scores %>%
+  group_by(Sex) %>%
+  summarise(
+    PC2 = mean(PC2),
+    PC3 = mean(PC3),
+    .groups = "drop"
+  )
+
+# Check centroid values
+
+print(centroids_PC23)
+
+
+# PCA Plot: PC2 vs PC3
+
+p_pca_PC23 <- ggplot(
+  pca_scores,
+  aes(
+    x = PC2,
+    y = PC3,
+    colour = Sex,
+    fill = Sex
+  )
+) +
+  
+  # Points
+  geom_point(
+    size = 2.5,
+    alpha = 0.6
+  ) +
+  
+  # 95% confidence ellipses
+  stat_ellipse(
+    type = "norm",
+    level = 0.95,
+    geom = "polygon",
+    alpha = 0.20,
+    linewidth = 1.2
+  ) +
+  
+  # Centroids
+  geom_point(
+    data = centroids_PC23,
+    aes(
+      x = PC2,
+      y = PC3,
+      colour = Sex
+    ),
+    shape = 4,
+    size = 6,
+    stroke = 2.5,
+    show.legend = FALSE
+  ) +
+  
+  # Colours
+  scale_colour_manual(
+    values = c(
+      Female = "#E07B7B",
+      Male = "#5DAEDB"
+    )
+  ) +
+  
+  scale_fill_manual(
+    values = c(
+      Female = "#F4A6A6",
+      Male = "#87CEEB"
+    )
+  ) +
+  
+  # Labels
+  labs(
+    title = "PCA of Song-level Acoustic Features",
+    x = paste0(
+      "PC2 (", var_explained[2], "%)"
+    ),
+    y = paste0(
+      "PC3 (", var_explained[3], "%)"
+    ),
+    colour = NULL,
+    fill = NULL
+  ) +
+  
+  # Theme
+  theme_bw(base_size = 14) +
+  
+  theme(
+    panel.border = element_rect(
+      colour = "black",
+      fill = NA,
+      linewidth = 1
+    ),
+    
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold",
+      size = 18
+    ),
+    
+    axis.title = element_text(
+      face = "bold"
+    ),
+    
+    axis.text = element_text(
+      colour = "black"
+    ),
+    
+    legend.title = element_blank(),
+    
+    legend.position = "right"
+  )
+
+
+# Show plot
+
+print(p_pca_PC23)
+
+
+# Save figures
+
+ggsave(
+  filename = "F:/IISER Tirupati/NF-BirdNet/NF-Plots/PCA/PCA_PC2_PC3_Centroids.png",
+  plot = p_pca_PC23,
+  width = 8,
+  height = 6,
+  dpi = 800,
+  bg = "white"
+)
+
+ggsave(
+  filename = "F:/IISER Tirupati/NF-BirdNet/NF-Plots/PCA/PCA_PC2_PC3_Centroids.tiff",
+  plot = p_pca_PC23,
+  width = 8,
+  height = 6,
+  dpi = 600,
+  compression = "lzw",
+  bg = "white"
+)
+
+```
+```{r}
+
+```
+
+
+# Note-level Acoustic Analysis
+
+```{r}
+# NOTE-LEVEL ACOUSTIC ANALYSIS
+# Wilcoxon tests + violin/box plots
+
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+
+
+# 1. Load note-level data
+
+
+Combined_NoteLevel_Data <- read_csv(
+  "F:/IISER Tirupati/NF-BirdNet/NF-R script/Combined_NoteLevel_Data.csv"
+)
+
+View(Combined_NoteLevel_Data)
+
+# Check column names
+colnames(Combined_NoteLevel_Data)
+
+
+# 2. Calculate note duration
+
+
+Combined_NoteLevel_Data <- Combined_NoteLevel_Data %>%
+  mutate(
+    Note_Duration = End.Time..s. - Begin.Time..s.
+  )
+
+
+
+# 3. Prepare data
+
+
+df_plot <- Combined_NoteLevel_Data %>%
+  select(
+    Sex,
+    Low.Freq..Hz.,
+    High.Freq..Hz.,
+    Delta.Freq..Hz.,
+    Center.Freq..Hz.,
+    Peak.Freq..Hz.,
+    Note_Duration
+  ) %>%
+  na.omit() %>%
+  rename(
+    "Minimum F0" = `Low.Freq..Hz.`,
+    "Maximum F0" = `High.Freq..Hz.`,
+    "Frequency bandwidth F0" = `Delta.Freq..Hz.`,
+    "Mean centre F0" = `Center.Freq..Hz.`,
+    "Peak F0" = `Peak.Freq..Hz.`,
+    "Note duration (s)" = Note_Duration
+  )
+
+
+
+# 4. Convert to long format
+
+
+long_df <- df_plot %>%
+  pivot_longer(
+    cols = -Sex,
+    names_to = "Feature",
+    values_to = "Value"
+  )
+
+
+
+# 5. Set parameter order
+
+
+long_df$Feature <- factor(
+  long_df$Feature,
+  levels = c(
+    "Minimum F0",
+    "Maximum F0",
+    "Frequency bandwidth F0",
+    "Mean centre F0",
+    "Peak F0",
+    "Note duration (s)"
+  )
+)
+
+
+
+# 6. Wilcoxon rank-sum tests
+
+
+wilcox_results <- long_df %>%
+  group_by(Feature) %>%
+  summarise(
+    W = wilcox.test(Value ~ Sex)$statistic,
+    p_value = wilcox.test(Value ~ Sex)$p.value,
+    .groups = "drop"
+  ) %>%
+  mutate(
+    p_label = ifelse(
+      p_value < 0.001,
+      "p < 0.001",
+      paste0("p = ", signif(p_value, 3))
+    )
+  )
+
+print(wilcox_results)
+
+
+
+# 7. Save Wilcoxon results
+
+
+write.csv(
+  wilcox_results,
+  "F:/IISER Tirupati/NF-BirdNet/NF-R script/Note_Level_Wilcoxon_Results.csv",
+  row.names = FALSE
+)
+
+
+
+# 8. Calculate p-value positions
+
+
+pvals <- long_df %>%
+  group_by(Feature) %>%
+  summarise(
+    ymax = max(Value, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  left_join(
+    wilcox_results,
+    by = "Feature"
+  ) %>%
+  mutate(
+    y_position = ymax * 1.08
+  )
+
+
+
+# 9. Create violin + box plots
+
+
+p <- ggplot(
+  long_df,
+  aes(
+    x = Sex,
+    y = Value,
+    fill = Sex,
+    color = Sex
+  )
+) +
+  
+  geom_violin(
+    trim = FALSE,
+    alpha = 0.4,
+    linewidth = 1.2
+  ) +
+  
+  geom_boxplot(
+    width = 0.12,
+    fill = "white",
+    color = "black",
+    outlier.shape = NA
+  ) +
+  
+  facet_wrap(
+    ~ Feature,
+    scales = "free_y",
+    ncol = 3
+  ) +
+  
+  scale_fill_manual(
+    values = c(
+      "Female" = "#F4A6A6",
+      "Male" = "#87CEEB"
+    )
+  ) +
+  
+  scale_color_manual(
+    values = c(
+      "Female" = "#E07B7B",
+      "Male" = "#5DAEDB"
+    )
+  ) +
+  
+  labs(
+    title = "Sex-based Differences in Note-level Acoustic Features",
+    x = "Sex",
+    y = "Acoustic Feature Values"
+  ) +
+  
+  theme_bw(base_size = 13) +
+  
+  theme(
+    legend.position = "none",
+    
+    panel.border = element_rect(
+      color = "black",
+      fill = NA,
+      linewidth = 1
+    ),
+    
+    strip.background = element_rect(
+      fill = "white",
+      color = "black"
+    ),
+    
+    strip.text = element_text(
+      face = "bold",
+      size = 15
+    ),
+    
+    axis.title = element_text(
+      face = "bold"
+    ),
+    
+    axis.text = element_text(
+      color = "black"
+    ),
+    
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold",
+      size = 18
+    )
+  )
+
+
+
+# 10. Add p-values
+
+
+p_final <- p +
+  geom_text(
+    data = pvals,
+    aes(
+      x = 1.5,
+      y = y_position,
+      label = p_label
+    ),
+    inherit.aes = FALSE,
+    size = 5,
+    fontface = "bold"
+  )
+
+
+
+# 11. Display plot
+
+
+print(p_final)
+
+
+
+# 12. Save high-resolution figure
+
+
+ggsave(
+  "F:/IISER Tirupati/NF-BirdNet/NF-R script/Note_Level_Acoustic_Features_Violin_Boxplots.jpg",
+  plot = p_final,
+  width = 12,
+  height = 8,
+  dpi = 600
+)
+```
+
+
+
+# PCA - Note-level Acoustic Analysis
+
+```{r}
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+
+# Load note-level data
+
+
+Combined_NoteLevel_Data <- read_csv(
+  "F:/IISER Tirupati/NF-BirdNet/NF-R script/Combined_NoteLevel_Data.csv"
+)
+
+
+# Calculate note duration
+
+
+Combined_NoteLevel_Data <- Combined_NoteLevel_Data %>%
+  mutate(
+    Note_Duration = End.Time..s. - Begin.Time..s.
+  )
+
+
+# Prepare PCA data
+
+
+pca_data <- Combined_NoteLevel_Data %>%
+  select(
+    Sex,
+    `Low.Freq..Hz.`,
+    `High.Freq..Hz.`,
+    `Delta.Freq..Hz.`,
+    `Center.Freq..Hz.`,
+    `Peak.Freq..Hz.`,
+    Note_Duration
+  ) %>%
+  na.omit()
+
+# Keep sex labels
+sex_labels <- pca_data$Sex
+
+# Acoustic features only
+pca_features <- pca_data %>%
+  select(-Sex)
+
+# Rename variables
+colnames(pca_features) <- c(
+  "Lowest_Frequency",
+  "Highest_Frequency",
+  "Frequency_Bandwidth",
+  "Mean_Centre_Frequency",
+  "Peak_Frequency",
+  "Note_Duration"
+)
+
+
+# Run PCA
+
+
+pca_res <- prcomp(
+  pca_features,
+  center = TRUE,
+  scale. = TRUE
+)
+
+
+# Variance explained
+
+
+var_explained <- round(
+  100 * summary(pca_res)$importance[2, 1:3],
+  1)
+
+print(var_explained)
+
+
+# PCA scores
+
+
+pca_scores <- as.data.frame(pca_res$x)
+pca_scores$Sex <- sex_labels
+
+
+# Calculate centroids
+
+
+centroids <- pca_scores %>%
+  group_by(Sex) %>%
+  summarise(
+    PC1 = mean(PC1),
+    PC2 = mean(PC2),
+    .groups = "drop"
+  )
+
+print(centroids)
+
+
+# PCA plot
+
+
+p_pca_PC12 <- ggplot(
+  pca_scores,
+  aes(
+    x = PC1,
+    y = PC2,
+    colour = Sex,
+    fill = Sex
+  )
+) +
+  
+  geom_point(
+    size = 2.5,
+    alpha = 0.6
+  ) +
+  
+  # 95% confidence ellipses
+  stat_ellipse(
+    type = "norm",
+    level = 0.95,
+    geom = "polygon",
+    alpha = 0.20,
+    linewidth = 1.2
+  ) +
+  
+  # Centroids
+  geom_point(
+    data = centroids,
+    aes(
+      x = PC1,
+      y = PC2,
+      colour = Sex
+    ),
+    shape = 4,
+    size = 6,
+    stroke = 2.5,
+    show.legend = FALSE
+  ) +
+  
+  scale_colour_manual(
+    values = c(
+      Female = "#E07B7B",
+      Male = "#5DAEDB"
+    )
+  ) +
+  
+  scale_fill_manual(
+    values = c(
+      Female = "#F4A6A6",
+      Male = "#87CEEB"
+    )
+  ) +
+  
+  labs(
+    title = "PCA of Note-level Acoustic Features",
+    x = paste0(
+      "PC1 (", var_explained[1], "%)"
+    ),
+    y = paste0(
+      "PC2 (", var_explained[2], "%)"
+    )
+  ) +
+  
+  theme_bw(base_size = 14) +
+  
+  theme(
+    panel.border = element_rect(
+      colour = "black",
+      fill = NA,
+      linewidth = 1
+    ),
+    
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold",
+      size = 18
+    ),
+    
+    axis.title = element_text(
+      face = "bold"
+    ),
+    
+    axis.text = element_text(
+      colour = "black"
+    ),
+    
+    legend.title = element_blank(),
+    legend.position = "right"
+  )
+
+print(p_pca_PC12)
+
+
+# Save
+
+
+ggsave(
+  "F:/IISER Tirupati/NF-BirdNet/NF-R script/Note_Level_PCA_PC1_PC2_Centroids.png",
+  p_pca_PC12,
+  width = 8,
+  height = 6,
+  dpi = 800,
+  bg = "white"
+)
+
+ggsave(
+  "F:/IISER Tirupati/NF-BirdNet/NF-R script/Note_Level_PCA_PC1_PC2_Centroids.tiff",
+  p_pca_PC12,
+  width = 8,
+  height = 6,
+  dpi = 600,
+  compression = "lzw",
+  bg = "white"
+)
+```
+
+# PC2 vs PC3
+
+```{r}
+# Calculate centroids
+centroids_PC23 <- pca_scores %>%
+  group_by(Sex) %>%
+  summarise(
+    PC2 = mean(PC2),
+    PC3 = mean(PC3),
+    .groups = "drop"
+  )
+
+# Check centroid values
+print(centroids_PC23)
+
+
+# PCA plot: PC2 vs PC3
+
+
+p_pca_PC23 <- ggplot(
+  pca_scores,
+  aes(
+    x = PC2,
+    y = PC3,
+    colour = Sex,
+    fill = Sex
+  )
+) +
+  
+  geom_point(
+    size = 2.5,
+    alpha = 0.6
+  ) +
+  
+  # 95% confidence ellipses
+  stat_ellipse(
+    type = "norm",
+    level = 0.95,
+    geom = "polygon",
+    alpha = 0.20,
+    linewidth = 1.2
+  ) +
+  
+  # Centroids
+  geom_point(
+    data = centroids_PC23,
+    aes(
+      x = PC2,
+      y = PC3,
+      colour = Sex
+    ),
+    shape = 4,
+    size = 6,
+    stroke = 2.5,
+    show.legend = FALSE
+  ) +
+  
+  scale_colour_manual(
+    values = c(
+      Female = "#E07B7B",
+      Male = "#5DAEDB"
+    )
+  ) +
+  
+  scale_fill_manual(
+    values = c(
+      Female = "#F4A6A6",
+      Male = "#87CEEB"
+    )
+  ) +
+  
+  labs(
+    title = "PCA of Note-level Acoustic Features",
+    x = paste0(
+      "PC2 (", var_explained[2], "%)"
+    ),
+    y = paste0(
+      "PC3 (", var_explained[3], "%)"
+    )
+  ) +
+  
+  theme_bw(base_size = 14) +
+  
+  theme(
+    panel.border = element_rect(
+      colour = "black",
+      fill = NA,
+      linewidth = 1
+    ),
+    
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold",
+      size = 18
+    ),
+    
+    axis.title = element_text(
+      face = "bold"
+    ),
+    
+    axis.text = element_text(
+      colour = "black"
+    ),
+    
+    legend.title = element_blank(),
+    legend.position = "right"
+  )
+
+print(p_pca_PC23)
+
+
+# Save
+
+
+ggsave(
+  "F:/IISER Tirupati/NF-BirdNet/NF-R script/Note_Level_PCA_PC2_PC3_Centroids.png",
+  p_pca_PC23,
+  width = 8,
+  height = 6,
+  dpi = 800,
+  bg = "white"
+)
+
+ggsave(
+  "F:/IISER Tirupati/NF-BirdNet/NF-R script/Note_Level_PCA_PC2_PC3_Centroids.tiff",
+  p_pca_PC23,
+  width = 8,
+  height = 6,
+  dpi = 600,
+  compression = "lzw",
+  bg = "white"
+)
+```
+
+
+# Note-level PCA Biplot
+
+```{r}
+library(ggrepel)
+library(grid)
+
+
+# PCA scores
+
+
+scores <- as.data.frame(
+  pca_res$x[, 1:2]
+)
+
+scores$Sex <- sex_labels
+
+
+# PCA loadings
+
+
+loadings <- as.data.frame(
+  pca_res$rotation[, 1:2]
+)
+
+loadings$Variable <- rownames(loadings)
+
+
+# Scale arrows automatically
+
+
+mult <- min(
+  (max(scores$PC1) - min(scores$PC1)) /
+    (max(loadings$PC1) - min(loadings$PC1)),
+  
+  (max(scores$PC2) - min(scores$PC2)) /
+    (max(loadings$PC2) - min(loadings$PC2))
+)
+
+mult <- mult * 0.70
+
+
+# PCA biplot
+
+
+p_biplot <- ggplot(
+  scores,
+  aes(
+    x = PC1,
+    y = PC2
+  )
+) +
+  
+  # Individual notes
+  geom_point(
+    aes(colour = Sex),
+    size = 2.8,
+    alpha = 0.7
+  ) +
+  
+  # 95% confidence ellipses
+  stat_ellipse(
+    aes(colour = Sex),
+    type = "norm",
+    level = 0.95,
+    linewidth = 1
+  ) +
+  
+  # Loading arrows
+  geom_segment(
+    data = loadings,
+    aes(
+      x = 0,
+      y = 0,
+      xend = PC1 * mult,
+      yend = PC2 * mult
+    ),
+    inherit.aes = FALSE,
+    colour = "purple4",
+    linewidth = 0.8,
+    arrow = arrow(
+      length = unit(0.25, "cm")
+    )
+  ) +
+  
+  # Loading labels
+  geom_text_repel(
+    data = loadings,
+    aes(
+      x = PC1 * mult,
+      y = PC2 * mult,
+      label = Variable
+    ),
+    inherit.aes = FALSE,
+    colour = "navy",
+    fontface = "bold",
+    size = 4,
+    box.padding = 0.6,
+    point.padding = 0.3,
+    segment.color = "grey50",
+    segment.size = 0.4,
+    max.overlaps = Inf
+  ) +
+  
+  # Colours
+  scale_colour_manual(
+    values = c(
+      Female = "#E07B7B",
+      Male = "#5DAEDB"
+    )
+  ) +
+  
+  # Labels
+  labs(
+    title = "PCA Biplot of Note-level Acoustic Features",
+    
+    x = paste0(
+      "PC1 (",
+      round(
+        summary(pca_res)$importance[2, 1] * 100,
+        1
+      ),
+      "%)"
+    ),
+    
+    y = paste0(
+      "PC2 (",
+      round(
+        summary(pca_res)$importance[2, 2] * 100,
+        1
+      ),
+      "%)"
+    )
+  ) +
+  
+  theme_bw(base_size = 15) +
+  
+  theme(
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold",
+      size = 18
+    ),
+    
+    panel.border = element_rect(
+      colour = "black",
+      fill = NA,
+      linewidth = 1
+    ),
+    
+    axis.title = element_text(
+      face = "bold"
+    ),
+    
+    axis.text = element_text(
+      colour = "black"
+    ),
+    
+    legend.title = element_blank(),
+    
+    legend.position = "right"
+  )
+
+# Display
+print(p_biplot)
+
+
+# Save biplot
+
+
+ggsave(
+  "F:/IISER Tirupati/NF-BirdNet/NF-R script/Note_Level_PCA_Biplot.png",
+  p_biplot,
+  width = 8,
+  height = 6,
+  dpi = 800,
+  bg = "white"
+)
+
+ggsave(
+  "F:/IISER Tirupati/NF-BirdNet/NF-R script/Note_Level_PCA_Biplot.tiff",
+  p_biplot,
+  width = 8,
+  height = 6,
+  dpi = 600,
+  compression = "lzw",
+  bg = "white"
+)
+```
+
+# NF-BirdNET Data: June 2024 to May 2025
+
+```{r}
+library(readr)
+
+BirdNET_SelectionTable_June2024_to_May2025 <- read_delim(
+  "BirdNET_SelectionTable_June2024_to_May2025.txt",
+  delim = "\t",
+  escape_double = FALSE,
+  trim_ws = TRUE
+)
+
+View(BirdNET_SelectionTable_June2024_to_May2025)
+
+colnames(BirdNET_SelectionTable_June2024_to_May2025)
+```
+
+# Monthly BirdNET Detections of Nilgiri Flycatcher
+
+```{r}
+library(dplyr)
+library(stringr)
+library(lubridate)
+
+
+# Nilgiri Flycatcher detections
+
+
+bird_nf <- BirdNET_SelectionTable_June2024_to_May2025 %>%
+  filter(Species.Code == "nilfly2")
+
+
+nrow(bird_nf)
+
+
+# Extract date from Begin.Path
+
+
+bird_nf <- bird_nf %>%
+  mutate(
+    Date = as.Date(
+      str_extract(Begin.Path, "\\d{8}"),
+      format = "%Y%m%d"
+    )
+  )
+
+
+# Create month
+
+
+bird_nf <- bird_nf %>%
+  mutate(
+    Month = month(Date, label = TRUE, abbr = TRUE)
+  )
+
+
+# Set June -> May order
+
+month_order <- c(
+  "Jun", "Jul", "Aug", "Sep", "Oct", "Nov",
+  "Dec", "Jan", "Feb", "Mar", "Apr", "May"
+)
+
+bird_nf$Month <- factor(
+  bird_nf$Month,
+  levels = month_order
+)
+
+
+# TOTAL NF detections per month
+
+
+monthly_total <- bird_nf %>%
+  group_by(Month) %>%
+  summarise(
+    Total_NF_detections = n(),
+    .groups = "drop"
+  )
+
+print(monthly_total)
+
+
+# DAILY NF detections
+
+
+daily_nf <- bird_nf %>%
+  group_by(Date) %>%
+  summarise(
+    NF_detections = n(),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    Month = factor(
+      month(Date, label = TRUE, abbr = TRUE),
+      levels = month_order
+    )
+  )
+
+
+# MONTHLY MEAN DAILY NF detections
+
+
+monthly_mean <- daily_nf %>%
+  group_by(Month) %>%
+  summarise(
+    Detection_days = n(),
+    Mean_daily_NF = mean(NF_detections),
+    SD = sd(NF_detections),
+    SE = SD / sqrt(Detection_days),
+    .groups = "drop"
+  )
+
+print(monthly_mean)
+
+
+# COMBINE TOTAL + MEAN
+
+
+monthly_summary <- monthly_total %>%
+  left_join(monthly_mean, by = "Month")
+
+print(monthly_summary)
+```
+
+# Mean Hourly Detections: Breeding (March–June) and Non-breeding (July–February)
+
+```{r}
+library(dplyr)
+library(stringr)
+library(lubridate)
+library(ggplot2)
+
+
+# 1. ONLY Nilgiri Flycatcher detections
+
+
+bird_nf <- BirdNET_SelectionTable_June2024_to_May2025 %>%
+  filter(Species.Code == "nilfly2")
+
+
+# 2. Extract date and hour
+
+
+bird_nf <- bird_nf %>%
+  mutate(
+    Date = as.Date(
+      str_extract(Begin.Path, "\\d{8}"),
+      format = "%Y%m%d"
+    ),
+    
+    Time = str_extract(
+      Begin.Path,
+      "(?<=_)\\d{6}(?=\\.wav)"
+    ),
+    
+    Hour = as.numeric(substr(Time, 1, 2))
+  )
+
+
+# 3. Keep hours 05:00–18:00
+
+
+bird_nf <- bird_nf %>%
+  filter(Hour >= 5 & Hour <= 18)
+
+
+# 4. Define breeding and non-breeding seasons
+
+
+bird_nf <- bird_nf %>%
+  mutate(
+    Month_num = month(Date),
+    
+    Season = ifelse(
+      Month_num %in% c(3, 4, 5, 6),
+      "Breeding",
+      "Non-breeding"
+    )
+  )
+
+
+# 5. NF detections per hour PER DAY
+
+
+hour_day <- bird_nf %>%
+  group_by(Season, Date, Hour) %>%
+  summarise(
+    NF_detections = n(),
+    .groups = "drop"
+  )
+
+
+# 6. Calculate mean ± SE
+
+
+hour_summary <- hour_day %>%
+  group_by(Season, Hour) %>%
+  summarise(
+    Mean = mean(NF_detections),
+    SD = sd(NF_detections),
+    N = n(),
+    SE = SD / sqrt(N),
+    .groups = "drop"
+  )
+
+# Check results
+print(hour_summary)
+
+
+# 7. Plot
+
+
+p <- ggplot(
+  hour_summary,
+  aes(
+    x = Hour,
+    y = Mean,
+    colour = Season,
+    group = Season
+  )
+) +
+  
+  geom_line(
+    linewidth = 1.2
+  ) +
+  
+  geom_point(
+    size = 3
+  ) +
+  
+  geom_errorbar(
+    aes(
+      ymin = Mean - SE,
+      ymax = Mean + SE
+    ),
+    width = 0.20,
+    linewidth = 0.7
+  ) +
+  
+  scale_colour_manual(
+    values = c(
+      "Breeding" = "#D73027",
+      "Non-breeding" = "#2C7BB6"
+    )
+  ) +
+  
+  scale_x_continuous(
+    breaks = 5:18,
+    limits = c(5, 18)
+  ) +
+  
+  labs(
+    x = "Time (hour)",
+    y = "Mean daily NF detections per hour",
+    colour = NULL
+  ) +
+  
+  theme_classic(
+    base_size = 16
+  ) +
+  
+  theme(
+    plot.title = element_blank(),
+    
+    axis.title = element_text(
+      face = "bold"
+    ),
+    
+    axis.text = element_text(
+      colour = "black",
+      size = 13
+    ),
+    
+    legend.position = "top",
+    
+    legend.text = element_text(
+      size = 13
+    )
+  )
+
+# Display plot
+print(p)
+
+
+# 8. Save figure
+
+
+ggsave(
+  "F:/IISER Tirupati/NF-BirdNet/NF-Plots/Breeding_vs_NonBreeding_Hourly_NF.png",
+  p,
+  width = 8,
+  height = 5.5,
+  dpi = 800
+)
+```
+
+# Heat Map: Annual NF Acoustic Activity Cycle
+
+## June 2024 – May 2025
+
+```{r}
+# Figure: Annual NF acoustic activity cycle
+# June 2024 – May 2025
+
+
+library(readr)
+library(dplyr)
+library(stringr)
+library(tidyr)
+library(lubridate)
+library(ggplot2)
+library(cowplot)
+
+
+# Read BirdNET data
+
+
+bird <- read_tsv(
+  "F:/IISER Tirupati/NF-BirdNet/NF-R script/BirdNET_SelectionTable_June2024_to_May2025.txt"
+)
+
+
+# ONLY Nilgiri Flycatcher detections
+
+
+bird <- bird %>%
+  filter(Species.Code == "nilfly2")
+
+
+# Extract date and time
+
+
+bird <- bird %>%
+  mutate(
+    File = basename(Begin.Path),
+    
+    Date = as.Date(
+      str_extract(File, "\\d{8}"),
+      "%Y%m%d"
+    ),
+    
+    Time = str_extract(
+      File,
+      "\\d{6}(?=\\.wav)"
+    ),
+    
+    Hour = as.numeric(substr(Time, 1, 2))
+  )
+
+
+# Keep daytime hours
+
+
+bird <- bird %>%
+  filter(
+    Hour >= 5,
+    Hour <= 18
+  )
+
+
+# Daily detections for each hour
+
+
+hourly_daily <- bird %>%
+  group_by(Date, Hour) %>%
+  summarise(
+    Detections = n(),
+    .groups = "drop"
+  )
+
+
+# Add missing days and hours as ZERO detections
+
+
+hourly_daily <- hourly_daily %>%
+  complete(
+    Date = seq(
+      min(Date),
+      max(Date),
+      by = "day"
+    ),
+    Hour = 5:18,
+    fill = list(
+      Detections = 0
+    )
+  )
+
+
+# Add month
+
+
+hourly_daily <- hourly_daily %>%
+  mutate(
+    Month = format(Date, "%b %Y")
+  )
+
+
+# TOP PANEL
+# Mean daily NF detections by hour
+
+
+hour_summary <- hourly_daily %>%
+  group_by(Hour) %>%
+  summarise(
+    Mean = mean(Detections),
+    SD = sd(Detections),
+    N = n(),
+    SE = SD / sqrt(N),
+    .groups = "drop"
+  )
+
+
+# Top line plot
+
+
+p1 <- ggplot(
+  hour_summary,
+  aes(
+    x = Hour,
+    y = Mean
+  )
+) +
+  
+  geom_line(
+    linewidth = 1.2
+  ) +
+  
+  geom_point(
+    size = 3
+  ) +
+  
+  geom_errorbar(
+    aes(
+      ymin = Mean - SD,
+      ymax = Mean + SD
+    ),
+    width = 0.20,
+    linewidth = 0.7
+  ) +
+  
+  scale_x_continuous(
+    breaks = 5:18,
+    limits = c(5, 18)
+  ) +
+  
+  labs(
+    x = NULL,
+    y = "Mean\nDetections"
+  ) +
+  
+  theme_classic(
+    base_size = 16
+  ) +
+  
+  theme(
+    axis.text.x = element_blank(),
+    axis.title.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    
+    axis.title = element_text(
+      face = "bold"
+    ),
+    
+    axis.text = element_text(
+      colour = "black"
+    ),
+    
+    plot.margin = margin(
+      b = 0
+    )
+  )
+
+
+# HEATMAP DATA
+# Mean daily NF detections for each month × hour
+
+
+heat_data <- hourly_daily %>%
+  group_by(Month, Hour) %>%
+  summarise(
+    MeanDetections = mean(Detections),
+    SD = sd(Detections),
+    .groups = "drop"
+  )
+
+
+# Month order
+
+
+month_order <- c(
+  "Jun 2024",
+  "Jul 2024",
+  "Aug 2024",
+  "Sep 2024",
+  "Oct 2024",
+  "Nov 2024",
+  "Dec 2024",
+  "Jan 2025",
+  "Feb 2025",
+  "Mar 2025",
+  "Apr 2025",
+  "May 2025"
+)
+
+
+# Complete all month × hour combinations
+
+
+heat_data <- heat_data %>%
+  complete(
+    Month = month_order,
+    Hour = 5:18,
+    fill = list(
+      MeanDetections = 0
+    )
+  )
+
+
+# Set month order
+
+
+heat_data$Month <- factor(
+  heat_data$Month,
+  levels = month_order
+)
+
+
+# HEATMAP
+
+
+p2 <- ggplot(
+  heat_data,
+  aes(
+    x = Hour,
+    y = Month,
+    fill = MeanDetections
+  )
+) +
+  
+  geom_tile(
+    colour = "white",
+    linewidth = 0.5,
+    width = 0.98,
+    height = 0.98
+  ) +
+  
+  scale_x_continuous(
+    breaks = 5:18,
+    expand = c(0, 0)
+  ) +
+  
+  scale_y_discrete(
+    drop = FALSE,
+    expand = expansion(
+      add = c(0, 0)
+    )
+  ) +
+  
+  scale_fill_gradient(
+    low = "#deebf7",
+    high = "#08519c",
+    name = "Mean\nDetections"
+  ) +
+  
+  labs(
+    x = "Hour of day",
+    y = "Month"
+  ) +
+  
+  theme_classic(
+    base_size = 16
+  ) +
+  
+  theme(
+    axis.title = element_text(
+      face = "bold"
+    ),
+    
+    axis.text = element_text(
+      colour = "black"
+    ),
+    
+    legend.title = element_text(
+      face = "bold"
+    ),
+    
+    panel.grid = element_blank(),
+    
+    plot.margin = margin(
+      5, 5, 5, 5
+    )
+  )
+
+
+# Combine line plot + heatmap
+
+
+final_plot <- plot_grid(
+  p1,
+  p2,
+  ncol = 1,
+  align = "v",
+  axis = "lr",
+  rel_heights = c(1, 4)
+)
+
+
+# Display final figure
+
+
+print(final_plot)
+
+
+# Save high-resolution JPG
+
+
+ggsave(
+  filename =
+    "F:/IISER Tirupati/NF-BirdNet/NF-Plots/Figure3_NF_AnnualActivityCycle_June2024_May2025.jpg",
+  
+  plot = final_plot,
+  
+  width = 14,
+  height = 8,
+  
+  units = "in",
+  
+  dpi = 600,
+  
+  bg = "white",
+  
+  device = "jpeg",
+  
+  quality = 100
+)
+```
+
+
+# Circular Statistics
+
+## Nilgiri Flycatcher: June 2024 – May 2025
+
+```{r}
+# Circular statistics for Nilgiri Flycatcher
+# June 2024 – May 2025
+
+
+library(dplyr)
+library(stringr)
+library(lubridate)
+library(circular)
+
+
+# Load data
+
+
+bird <- BirdNET_SelectionTable_June2024_to_May2025
+
+
+# Filter ONLY Nilgiri Flycatcher
+
+
+bird <- bird %>%
+  filter(Species.Code == "nilfly2")
+
+
+# Extract date
+
+
+bird <- bird %>%
+  mutate(
+    Date = as.Date(
+      str_extract(Begin.Path, "\\d{8}"),
+      format = "%Y%m%d"
+    )
+  )
+
+
+# Keep June 2024 – May 2025
+
+
+study_start <- as.Date("2024-06-01")
+study_end   <- as.Date("2025-05-31")
+
+bird <- bird %>%
+  filter(
+    Date >= study_start,
+    Date <= study_end
+  )
+
+
+# ANNUAL CIRCULAR STATISTICS
+
+
+# Count NF detections per day
+
+daily_counts <- bird %>%
+  group_by(Date) %>%
+  summarise(
+    Detections = n(),
+    .groups = "drop"
+  )
+
+
+# Convert date to day number
+
+daily_counts <- daily_counts %>%
+  mutate(
+    StudyDay = as.numeric(Date - study_start) + 1
+  )
+
+
+# Convert day of year to circular angle
+
+daily_counts$Angle <- circular(
+  2 * pi * daily_counts$StudyDay / 365,
+  units = "radians",
+  modulo = "2pi"
+)
+
+
+# Weight each day by number of detections
+
+annual_angles <- rep(
+  daily_counts$Angle,
+  daily_counts$Detections
+)
+
+annual_angles <- circular(
+  annual_angles,
+  units = "radians",
+  modulo = "2pi"
+)
+
+
+# ANNUAL RESULTS
+
+
+mean.circular(annual_angles)
+
+rho.circular(annual_angles)
+
+sd.circular(annual_angles)
+
+rayleigh.test(annual_angles)
+
+
+
+# DIEL CIRCULAR STATISTICS
+
+
+# Extract time
+
+bird <- bird %>%
+  mutate(
+    Time = str_extract(
+      Begin.Path,
+      "(?<=_)\\d{6}(?=\\.wav)"
+    ),
+    
+    Hour = as.numeric(substr(Time, 1, 2)),
+    
+    Minute = as.numeric(substr(Time, 3, 4)),
+    
+    TimeDecimal = Hour + Minute / 60
+  )
+
+
+# Keep 05:00–19:00
+
+bird_day <- bird %>%
+  filter(
+    TimeDecimal >= 5,
+    TimeDecimal <= 19
+  )
+
+
+# Count detections per hour
+
+hourly_counts <- bird_day %>%
+  group_by(Hour) %>%
+  summarise(
+    Detections = n(),
+    .groups = "drop"
+  )
+
+
+# Convert hour to circular angle
+
+hourly_counts$Angle <- circular(
+  2 * pi * (hourly_counts$Hour - 5) / 14,
+  units = "radians",
+  modulo = "2pi"
+)
+
+
+# Weight by number of detections
+
+diel_angles <- rep(
+  hourly_counts$Angle,
+  hourly_counts$Detections
+)
+
+diel_angles <- circular(
+  diel_angles,
+  units = "radians",
+  modulo = "2pi"
+)
+
+
+# DIEL RESULTS
+
+
+mean.circular(diel_angles)
+
+rho.circular(diel_angles)
+
+sd.circular(diel_angles)
+
+rayleigh.test(diel_angles)
+```
+
+
+
+# Annual Radial Plot
+
+## June 2024 to May 2025
+
+```{r}
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(stringr)
+
+
+# 1. Keep ONLY Nilgiri Flycatcher detections
+
+
+bird_nf <- BirdNET_SelectionTable_June2024_to_May2025 %>%
+  filter(Species.Code == "nilfly2")
+
+
+# 2. Extract date
+
+
+bird_nf <- bird_nf %>%
+  mutate(
+    Date = as.Date(
+      str_extract(Begin.Path, "\\d{8}"),
+      format = "%Y%m%d"
+    ),
+    Month = month(Date, label = TRUE, abbr = TRUE)
+  )
+
+
+# 3. Calculate daily NF detections
+
+
+daily_counts <- bird_nf %>%
+  group_by(Date, Month) %>%
+  summarise(
+    Detections = n(),
+    .groups = "drop"
+  )
+
+
+# 4. Calculate mean daily NF detections per month
+
+
+monthly_summary <- daily_counts %>%
+  group_by(Month) %>%
+  summarise(
+    Mean = mean(Detections),
+    SD = sd(Detections),
+    .groups = "drop"
+  )
+
+print(monthly_summary)
+
+
+# 5. Ensure June → May order
+
+
+monthly_summary$Month <- factor(
+  monthly_summary$Month,
+  levels = c(
+    "Jun", "Jul", "Aug", "Sep", "Oct", "Nov",
+    "Dec", "Jan", "Feb", "Mar", "Apr", "May"
+  )
+)
+
+
+# 6. Radial plot
+
+
+p <- ggplot(
+  monthly_summary,
+  aes(x = Month, y = Mean)
+) +
+  
+  geom_col(
+    width = 1,
+    fill = "steelblue4",
+    colour = "black",
+    linewidth = 0.35
+  ) +
+  
+  coord_polar(start = 0) +
+  
+  scale_y_continuous(
+    expand = c(0, 0)
+  ) +
+  
+  labs(
+    title = "Monthly vocal activity of Nilgiri Flycatcher",
+    x = "",
+    y = "Mean daily NF detections"
+  ) +
+  
+  theme_classic(
+    base_size = 16
+  ) +
+  
+  theme(
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold",
+      size = 18
+    ),
+    
+    axis.title.y = element_text(
+      face = "bold",
+      size = 14
+    ),
+    
+    axis.text.x = element_text(
+      size = 13,
+      face = "bold",
+      colour = "black"
+    ),
+    
+    axis.text.y = element_text(
+      size = 11,
+      colour = "black"
+    ),
+    
+    panel.grid.major = element_line(
+      colour = "grey85",
+      linewidth = 0.4
+    ),
+    
+    panel.grid.minor = element_blank(),
+    
+    axis.line = element_blank(),
+    axis.ticks = element_blank(),
+    
+    plot.background = element_rect(
+      fill = "white",
+      colour = NA
+    ),
+    
+    panel.background = element_rect(
+      fill = "white",
+      colour = NA
+    )
+  )
+
+
+# Display plot
+
+print(p)
+
+
+# 7. Save TIFF
+
+
+ggsave(
+  "F:/IISER Tirupati/NF-BirdNet/NF-Plots/Fig5_NF_Monthly_Radial_Plot.tiff",
+  plot = p,
+  width = 8,
+  height = 8,
+  units = "in",
+  dpi = 600,
+  compression = "lzw",
+  bg = "white"
+)
+
+
+# 8. Save PNG
+
+
+ggsave(
+  "F:/IISER Tirupati/NF-BirdNet/NF-Plots/Fig5_NF_Monthly_Radial_Plot.png",
+  plot = p,
+  width = 8,
+  height = 8,
+  units = "in",
+  dpi = 600,
+  bg = "white"
+)
+```
