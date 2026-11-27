@@ -1,0 +1,21 @@
+Selection	View	Channel	Begin Time (s)	End Time (s)	Low Freq (Hz)	High Freq (Hz)	Common Name	Species Code	Confidence	Begin Path	File Offset (s)
+1	Spectrogram 1	1	0.0	3.0	2000	4500	Male	Male	0.4239	G:\Nilgiri Flycatcher\CC-M-F\07-ARU-recordings\Female-NFCNESTKODI_20250411_143000.wav	0.0
+2	Spectrogram 1	1	0.0	3.0	2000	4500	Female	Female	0.2475	G:\Nilgiri Flycatcher\CC-M-F\07-ARU-recordings\Female-NFCNESTKODI_20250411_143000.wav	0.0
+3	Spectrogram 1	1	3.0	6.0	2000	4500	Male	Male	0.4040	G:\Nilgiri Flycatcher\CC-M-F\07-ARU-recordings\Female-NFCNESTKODI_20250411_143000.wav	3.0
+4	Spectrogram 1	1	3.0	6.0	2000	4500	Female	Female	0.2202	G:\Nilgiri Flycatcher\CC-M-F\07-ARU-recordings\Female-NFCNESTKODI_20250411_143000.wav	3.0
+5	Spectrogram 1	1	6.0	9.0	2000	4500	Male	Male	0.4074	G:\Nilgiri Flycatcher\CC-M-F\07-ARU-recordings\Female-NFCNESTKODI_20250411_143000.wav	6.0
+6	Spectrogram 1	1	6.0	9.0	2000	4500	Female	Female	0.2643	G:\Nilgiri Flycatcher\CC-M-F\07-ARU-recordings\Female-NFCNESTKODI_20250411_143000.wav	6.0
+7	Spectrogram 1	1	9.0	12.0	2000	4500	Male	Male	0.4945	G:\Nilgiri Flycatcher\CC-M-F\07-ARU-recordings\Female-NFCNESTKODI_20250411_143000.wav	9.0
+8	Spectrogram 1	1	9.0	12.0	2000	4500	Female	Female	0.3258	G:\Nilgiri Flycatcher\CC-M-F\07-ARU-recordings\Female-NFCNESTKODI_20250411_143000.wav	9.0
+9	Spectrogram 1	1	12.0	15.0	2000	4500	Male	Male	0.4679	G:\Nilgiri Flycatcher\CC-M-F\07-ARU-recordings\Female-NFCNESTKODI_20250411_143000.wav	12.0
+10	Spectrogram 1	1	12.0	15.0	2000	4500	Female	Female	0.3435	G:\Nilgiri Flycatcher\CC-M-F\07-ARU-recordings\Female-NFCNESTKODI_20250411_143000.wav	12.0
+11	Spectrogram 1	1	15.0	18.0	2000	4500	Male	Male	0.5797	G:\Nilgiri Flycatcher\CC-M-F\07-ARU-recordings\Female-NFCNESTKODI_20250411_143000.wav	15.0
+12	Spectrogram 1	1	15.0	18.0	2000	4500	Female	Female	0.4115	G:\Nilgiri Flycatcher\CC-M-F\07-ARU-recordings\Female-NFCNESTKODI_20250411_143000.wav	15.0
+13	Spectrogram 1	1	18.0	21.0	2000	4500	Male	Male	0.6064	G:\Nilgiri Flycatcher\CC-M-F\07-ARU-recordings\Female-NFCNESTKODI_20250411_143000.wav	18.0
+14	Spectrogram 1	1	18.0	21.0	2000	4500	Female	Female	0.4011	G:\Nilgiri Flycatcher\CC-M-F\07-ARU-recordings\Female-NFCNESTKODI_20250411_143000.wav	18.0
+15	Spectrogram 1	1	21.0	24.0	2000	4500	Male	Male	0.4733	G:\Nilgiri Flycatcher\CC-M-F\07-ARU-recordings\Female-NFCNESTKODI_20250411_143000.wav	21.0
+16	Spectrogram 1	1	21.0	24.0	2000	4500	Female	Female	0.3318	G:\Nilgiri Flycatcher\CC-M-F\07-ARU-recordings\Female-NFCNESTKODI_20250411_143000.wav	21.0
+17	Spectrogram 1	1	24.0	27.0	2000	4500	Male	Male	0.4141	G:\Nilgiri Flycatcher\CC-M-F\07-ARU-recordings\Female-NFCNESTKODI_20250411_143000.wav	24.0
+18	Spectrogram 1	1	24.0	27.0	2000	4500	Female	Female	0.2002	G:\Nilgiri Flycatcher\CC-M-F\07-ARU-recordings\Female-NFCNESTKODI_20250411_143000.wav	24.0
+19	Spectrogram 1	1	27.0	30.0	2000	4500	Male	Male	0.4518	G:\Nilgiri Flycatcher\CC-M-F\07-ARU-recordings\Female-NFCNESTKODI_20250411_143000.wav	27.0
+20	Spectrogram 1	1	27.0	30.0	2000	4500	Female	Female	0.2567	G:\Nilgiri Flycatcher\CC-M-F\07-ARU-recordings\Female-NFCNESTKODI_20250411_143000.wav	27.0
