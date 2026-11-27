@@ -1,0 +1,549 @@
+---
+title: "NF-BirdNET"
+author: "Helly"
+date: "2026-11-26"
+output: html_document
+---
+
+```{r}
+
+library(readr)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(lubridate)
+library(ggplot2)
+library(cowplot)
+library(circular)
+
+# Import dataset
+BirdNET_SelectionTable_June2024_to_May2025 <- read_delim(
+  "BirdNET_SelectionTable_June2024_to_May2025.txt", delim = "\t", trim_ws = TRUE)
+```
+
+
+
+```{r}
+# 3.3 Method – Nilgiri Flycatcher BirdNET Detections
+# Study period: June 2024 to May 2025
+
+# Filter Nilgiri Flycatcher detections
+bird_nf <- BirdNET_SelectionTable_June2024_to_May2025 %>%
+  filter(Species.Code == "nilfly2") %>%
+  mutate(Date = as.Date(str_extract(Begin.Path, "\\d{8}"), format = "%Y%m%d"),
+    Month = factor(month(Date, label = TRUE, abbr = TRUE),
+      levels = c("Jun", "Jul", "Aug", "Sep", "Oct", "Nov",
+                 "Dec", "Jan", "Feb", "Mar", "Apr", "May")),
+    Time = str_extract(Begin.Path, "(?<=_)\\d{6}(?=\\.wav)"),
+    Hour = as.numeric(substr(Time, 1, 2)),
+    Minute = as.numeric(substr(Time, 3, 4)),
+    TimeDecimal = Hour + Minute / 60,
+    Season = ifelse(month(Date) %in% 3:6,
+      "Breeding", "Non-breeding" ))
+
+# Filter detections to 05:00–18:59 h
+bird_daytime <- bird_nf %>% filter(!is.na(Date),
+    !is.na(TimeDecimal),Hour >= 5, Hour <= 18 )
+
+# Check filtered dataset
+nrow(bird_daytime)
+range(bird_daytime$Date)
+table(bird_daytime$Season)
+```
+```{r}
+# Monthly daytime NF detections
+
+daily_nf <- bird_daytime %>% count(Date, Month, name = "NF_detections")
+
+monthly_summary <- daily_nf %>%
+  group_by(Month) %>%
+  summarise(
+    Total_NF_detections = sum(NF_detections),
+    Detection_days = n(),
+    Mean_daily_NF = mean(NF_detections),
+    SD = sd(NF_detections),
+    SE = SD / sqrt(Detection_days),
+    .groups = "drop")
+
+print(monthly_summary)
+```
+
+
+
+```{r}
+
+# Figure 4 – Mean hourly NF detections:
+# Breeding (March–June) and Non-breeding (July–February)
+
+# Hourly detections per date
+hour_day <- bird_daytime %>% count(Season, Date, Hour, name = "NF_detections")
+
+# Mean ± SE
+hour_summary <- hour_day %>%
+  group_by(Season, Hour) %>%
+  summarise( Mean = mean(NF_detections),
+    SE = sd(NF_detections) / sqrt(n()),
+    .groups = "drop")
+
+print(hour_summary)
+
+# Plot
+Hourly_detections <- ggplot(
+  hour_summary,
+  aes(Hour, Mean, colour = Season, group = Season)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  geom_errorbar(
+    aes(ymin = Mean - SE, ymax = Mean + SE),
+    width = 0.2, linewidth = 0.7) +
+  scale_colour_manual(values = c(
+    "Breeding" = "#D73027",
+    "Non-breeding" = "#2C7BB6")) +
+  scale_x_continuous(breaks = 5:18, limits = c(5, 18)) +
+  labs(
+    x = "Time (hour)",
+    y = "Mean daily NF detections per hour",
+    colour = NULL) +
+  theme_classic(base_size = 16) +
+  theme(axis.title = element_text(face = "bold"),
+    axis.text = element_text(colour = "black", size = 13),
+    legend.position = "top",
+    legend.text = element_text(size = 13) )
+
+print(Hourly_detections)
+```
+
+
+
+```{r}
+# Figure 5 – Heat Map: Annual NF Acoustic Activity Cycle
+
+# Daily detections per hour
+hourly_daily <- bird_daytime %>%
+  count(Date, Hour, name = "Detections") %>%
+  tidyr::complete(Date = seq(min(Date), max(Date), by = "day"),
+    Hour = 5:18,
+    fill = list(Detections = 0))
+
+# Mean hourly detections
+annual_hour_summary <- hourly_daily %>%
+  group_by(Hour) %>% summarise(Mean = mean(Detections),
+    SD = sd(Detections),
+    .groups = "drop")
+
+# Top line plot
+p1 <- ggplot(annual_hour_summary, aes(Hour, Mean)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = Mean - SD, ymax = Mean + SD),
+    width = 0.2, linewidth = 0.7 ) +
+  scale_x_continuous(breaks = 5:18, limits = c(5, 18)) +
+  labs(x = NULL, y = "Mean\nDetections") +
+  theme_classic(base_size = 16) +
+  theme(axis.text.x = element_blank(),
+    axis.title.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.title = element_text(face = "bold"),
+    axis.text = element_text(colour = "black"),
+    plot.margin = margin(b = 0))
+
+# Monthly heatmap data
+month_order <- c("Jun 2024", "Jul 2024", "Aug 2024", "Sep 2024",
+  "Oct 2024", "Nov 2024", "Dec 2024", "Jan 2025",
+  "Feb 2025", "Mar 2025", "Apr 2025", "May 2025")
+
+heat_data <- hourly_daily %>%
+  mutate(Month = format(Date, "%b %Y")) %>%
+  group_by(Month, Hour) %>%
+  summarise(
+    MeanDetections = mean(Detections),
+    .groups = "drop") %>%
+  tidyr::complete(
+    Month = month_order,
+    Hour = 5:18,
+    fill = list(MeanDetections = 0)) %>%
+  mutate(Month = factor(Month, levels = month_order))
+
+# Heatmap
+p2 <- ggplot(heat_data, aes(Hour, Month, fill = MeanDetections)) +
+  geom_tile( colour = "white", linewidth = 0.5,
+    width = 0.98, height = 0.98 ) +
+  scale_x_continuous(breaks = 5:18, expand = c(0, 0)) +
+  scale_y_discrete(drop = FALSE, expand = expansion(add = c(0, 0))) +
+  scale_fill_gradient(
+    low = "#deebf7", high = "#08519c",
+    name = "Mean\nDetections") +
+  labs(x = "Hour of day", y = "Month") +
+  theme_classic(base_size = 16) +
+  theme(axis.title = element_text(face = "bold"),
+    axis.text = element_text(colour = "black"),
+    legend.title = element_text(face = "bold"),
+    panel.grid = element_blank())
+
+# Combine plots
+Heat_map <- cowplot::plot_grid(
+  p1, p2, ncol = 1, align = "v",
+  axis = "lr", rel_heights = c(1, 4))
+
+print(Heat_map)
+```
+
+
+
+```{r}
+# 3.3 Method – Circular Statistics: Annual and Diel Activity
+
+# Study period
+study_start <- as.Date("2024-06-01")
+study_end <- as.Date("2025-05-31")
+
+# Use daytime detections only
+bird <- bird_daytime %>% filter(Date >= study_start, Date <= study_end)
+
+# ANNUAL CIRCULAR STATISTICS
+
+daily_counts <- bird %>%
+  count(Date, name = "Detections") %>%
+  mutate(StudyDay = as.numeric(Date - study_start) + 1)
+
+annual_angles <- circular(
+  rep(2 * pi * daily_counts$StudyDay / 365,
+    daily_counts$Detections),
+  units = "radians",
+  modulo = "2pi")
+
+mean.circular(annual_angles)
+rho.circular(annual_angles)
+sd.circular(annual_angles)
+rayleigh.test(annual_angles)
+
+
+# DIEL CIRCULAR STATISTICS
+
+hourly_counts <- bird %>%
+  count(Hour, name = "Detections")
+diel_angles <- circular(
+  rep(2 * pi * (hourly_counts$Hour - 5) / 14,
+    hourly_counts$Detections ),
+  units = "radians",
+  modulo = "2pi")
+
+mean.circular(diel_angles)
+rho.circular(diel_angles)
+sd.circular(diel_angles)
+rayleigh.test(diel_angles)
+```
+
+
+
+
+```{r}
+# Supplementary Figure 5 – Annual Radial Plot
+
+Radial_plot <- ggplot(monthly_summary,
+  aes(x = Month, y = Mean_daily_NF)) +
+  geom_col(width = 1, fill = "steelblue4",
+    colour = "black", linewidth = 0.35) +
+  coord_polar(start = 0) + scale_y_continuous(expand = c(0, 0)) +
+  labs(title = "Monthly daytime vocal activity of Nilgiri Flycatcher",
+    x = "",y = "Mean daily NF detections") +
+  theme_classic(base_size = 16) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
+    axis.title.y = element_text(face = "bold", size = 14),
+    axis.text.x = element_text(
+      size = 13, face = "bold", colour = "black"),
+    axis.text.y = element_text(size = 11, colour = "black"),
+    panel.grid.major = element_line(
+      colour = "grey85", linewidth = 0.4),
+    panel.grid.minor = element_blank(),
+    axis.line = element_blank(),
+    axis.ticks = element_blank())
+print(Radial_plot)
+```
+
+
+
+
+```{r}
+# 3.2 Results - Sex-specific BirdNET Classifier Evaluation (G drive 04)
+
+# Directories and parameters
+manual_sex_files <- choose.files("Select manual annotation files",multi = TRUE)
+birdnet_sex_files <- choose.files("Select BirdNET annotation files",multi = TRUE)
+minimum_overlap <- 0.5
+thresholds <- seq(0.1, 1.0, by = 0.1)
+classes <- c("Female", "Male")
+
+
+# clean manual annotations
+manual_sex_clean <- map_dfr(manual_sex_files, read.delim) %>%
+  mutate(Audiofile = str_to_lower(basename(gsub("\\\\+", "/", Begin.Path))),
+    Sex = str_to_title(trimws(Species.Code)),
+    Begin = as.numeric(Begin.Time..s.),
+    End = as.numeric(End.Time..s.)) %>%
+  filter(Sex %in% classes, !is.na(Begin), !is.na(End), End > Begin)
+
+
+# clean BirdNET predictions
+birdnet_sex_clean <- map_dfr(birdnet_sex_files, read.delim) %>%
+  mutate(
+    Audiofile = str_to_lower(basename(gsub("\\\\+", "/", Begin.Path))),
+    Sex = str_to_title(trimws(Species.Code)),
+    Begin = as.numeric(Begin.Time..s.),
+    End = as.numeric(End.Time..s.),
+    Confidence = as.numeric(Confidence)) %>%
+  filter(Sex %in% classes, !is.na(Begin), !is.na(End),
+    End > Begin, !is.na(Confidence) )
+
+
+# Match manual songs with BirdNET detections
+match_events_sex <- function(threshold, sex) {
+  manual <- manual_sex_clean %>%
+    filter(Sex == sex) %>%
+    mutate(Manual_ID = row_number())
+  predictions <- birdnet_sex_clean %>%
+    filter(Sex == sex, Confidence >= threshold) %>%
+    mutate(Prediction_ID = row_number())
+  
+  # Match manual songs with BirdNET detections
+  matches <- inner_join(
+    manual, predictions, by = "Audiofile",
+    suffix = c("_manual", "_birdnet")) %>%
+    mutate(Overlap = pmin(End_manual, End_birdnet) -
+        pmax(Begin_manual, Begin_birdnet)) %>%
+    filter(Overlap >= minimum_overlap)
+  
+  # Count each manual song only once
+  matched_manual <- unique(matches$Manual_ID)
+  
+  # Identify BirdNET predictions associated with manual songs
+  matched_predictions <- unique(matches$Prediction_ID)
+  
+  TP <- length(matched_manual)
+  FN <- nrow(manual) - TP
+  FP <- nrow(predictions) - length(matched_predictions)
+  
+  Precision <- if (TP + FP > 0) TP / (TP + FP) else NA
+  Recall <- if (TP + FN > 0) TP / (TP + FN) else NA
+  F1 <- if (!is.na(Precision) && !is.na(Recall) &&
+            Precision + Recall > 0) {
+    2 * Precision * Recall / (Precision + Recall) } else NA
+  data.frame(Threshold = threshold, Sex = sex, TP, FP, FN,
+             Precision, Recall, F1)}
+
+
+# Calculate metrics for each threshold
+results_sex <- map_dfr(thresholds, function(th) {
+  sex_results <- map_dfr(
+    classes, ~ match_events_sex(th, .x) )
+  overall <- sex_results %>%
+    summarise(Threshold = th,
+      Sex = "Overall",
+      TP = sum(TP),
+      FP = sum(FP),
+      FN = sum(FN)) %>%
+    mutate( Precision = ifelse(TP + FP > 0, TP / (TP + FP), NA),
+      Recall = ifelse(TP + FN > 0, TP / (TP + FN), NA),
+      F1 = ifelse(Precision + Recall > 0,
+        2 * Precision * Recall / (Precision + Recall), NA))
+  bind_rows(sex_results, overall)})
+
+
+# Results table
+Sex_Specific_table <- results_sex %>%
+  select(Threshold, Sex, Precision, Recall, F1) %>%
+  pivot_wider(names_from = Sex,
+    values_from = c(Precision, Recall, F1),
+    names_glue = "{Sex}_{.value}" ) %>%
+  mutate(across(where(is.numeric), ~ round(.x, 4)))
+print(Sex_Specific_table)
+```
+
+
+
+
+
+```{r}
+# 3.2 Results - Default BirdNET Classifier Evaluation (G drive 03)
+
+# Directories and parameters
+manual_files <- choose.files("Select manual annotation files",multi = TRUE)
+birdnet_files <- choose.files("Select BirdNET annotation files",multi = TRUE)
+minimum_overlap <- 0.5
+thresholds <- seq(0.1, 1.0, by = 0.1)
+
+
+# Import and clean manual annotations
+manual_clean <- map_dfr(manual_files, read.delim) %>%
+  mutate(
+    Audiofile = str_to_lower(basename(Begin.Path)),
+    Begin = as.numeric(Begin.Time..s.),
+    End = as.numeric(End.Time..s.),
+    Species = trimws(as.character(Species.Code))) %>%
+  filter( str_to_lower(Species) == "nilfly2",
+    !is.na(Begin), !is.na(End), End > Begin )
+
+
+# Import and clean BirdNET predictions
+birdnet_clean <- map_dfr(birdnet_files, read.delim) %>%
+  mutate(
+    Audiofile = str_to_lower(basename(Begin.Path)),
+    Begin = as.numeric(Begin.Time..s.),
+    End = as.numeric(End.Time..s.),
+    Confidence = as.numeric(Confidence),
+    Species = trimws(as.character(Common.Name)) ) %>% filter(
+    str_to_lower(Species) == "nilgiri flycatcher",
+    !is.na(Begin), !is.na(End), End > Begin,
+    !is.na(Confidence) )
+
+
+# Match manual songs with BirdNET detections
+match_events <- function(threshold) {
+  manual <- manual_clean %>%
+    mutate(Manual_ID = row_number())
+  predictions <- birdnet_clean %>%
+    filter(Confidence >= threshold) %>%
+    mutate(Prediction_ID = row_number())
+  matches <- inner_join(
+    manual, predictions, by = "Audiofile",
+    suffix = c("_manual", "_birdnet")) %>%
+  mutate(Overlap = pmin(End_manual, End_birdnet) -
+        pmax(Begin_manual, Begin_birdnet)) %>%
+    filter(Overlap >= minimum_overlap) %>%
+    arrange(desc(Overlap))
+  
+  # Assign each prediction to only one manual song
+  assigned <- matches %>%
+    group_by(Audiofile, Prediction_ID) %>%
+    slice_max(Overlap, n = 1, with_ties = FALSE) %>% ungroup()
+  
+  # Count each manual song only once
+  matched_manual <- unique(assigned$Manual_ID)
+  matched_predictions <- unique(assigned$Prediction_ID)
+  
+  TP <- length(matched_manual)
+  FN <- nrow(manual) - TP
+  FP <- nrow(predictions) - length(matched_predictions)
+  
+  Precision <- if (TP + FP > 0) TP / (TP + FP) else NA
+  Recall <- if (TP + FN > 0) TP / (TP + FN) else NA
+  F1 <- if (!is.na(Precision) && !is.na(Recall) &&
+            Precision + Recall > 0) {2 * Precision * Recall / (Precision + Recall)} else NA
+  data.frame(Threshold = threshold, TP, FP, FN,
+    Precision, Recall, F1 )}
+
+# Calculate metrics for each threshold
+results <- map_dfr(thresholds, match_events)
+
+# Final results table
+Species_Specific_table <- results %>% select(Threshold, Precision, Recall, F1) %>%
+  mutate(across(where(is.numeric), ~ round(.x, 4)))
+print(Species_Specific_table)
+```
+
+
+
+
+
+```{r}
+# Overall manual vs BirdNET detection summary
+
+manual_summary <- manual_clean %>% mutate(Manual_ID = row_number())
+birdnet_summary <- birdnet_clean %>% mutate(Prediction_ID = row_number())
+
+# Match detections based on temporal overlap
+matched_events <- inner_join(
+  manual_summary, birdnet_summary,
+  by = "Audiofile",
+  suffix = c("_manual", "_birdnet")) %>%
+  mutate( Overlap = pmin(End_manual, End_birdnet) -
+      pmax(Begin_manual, Begin_birdnet)
+  ) %>% filter(Overlap >= minimum_overlap) %>%
+  arrange(desc(Overlap))
+
+# Assign each BirdNET prediction to only one manual song
+assigned <- matched_events %>%
+  group_by(Prediction_ID) %>%
+  slice_max(Overlap, n = 1, with_ties = FALSE) %>%
+  ungroup()
+
+# Count each manual song only once
+Detected <- n_distinct(assigned$Manual_ID)
+
+Total_Manual <- nrow(manual_summary)
+Total_BirdNET <- nrow(birdnet_summary)
+Missed <- Total_Manual - Detected
+
+Default_BirdNET_Summary <- data.frame(
+  Total_Manual,
+  Total_BirdNET,
+  Detected,
+  Missed,
+  Detection_Rate = round(Detected / Total_Manual * 100, 2))
+print(Default_BirdNET_Summary)
+```
+
+
+
+
+
+```{r}
+# Monthly data
+monthly_results <- manual_summary %>%
+  mutate( Date = as.Date(
+      str_extract(Audiofile, "\\d{8}"),
+      format = "%Y%m%d"),
+    Detected = Manual_ID %in% unique(assigned$Manual_ID)
+  ) %>% filter(!is.na(Date)) %>%
+  mutate( Month = as.Date(format(Date, "%Y-%m-01"))
+  ) %>% group_by(Month) %>%
+  summarise( Total_Manual_Songs = n(),
+    Detected_Songs = sum(Detected), .groups = "drop")
+
+
+# Plotting
+bar_data <- monthly_results %>%
+  mutate(Month = factor(format(Month, "%B"),
+      levels = c("March", "April", "May", "October", "November", "December") ) ) %>%
+  arrange(Month) %>% select(Month,
+    Actual_Songs = Total_Manual_Songs,
+    BirdNET_Detected = Detected_Songs )
+
+bar_long <- bar_data %>%
+  pivot_longer(
+    cols = c(Actual_Songs, BirdNET_Detected),
+    names_to = "Category",
+    values_to = "Songs") %>%
+  mutate(Category = recode(Category,
+      Actual_Songs = "Actual Number of Songs",
+      BirdNET_Detected = "Songs Detected by BirdNET"))
+
+
+# Bar graph
+Bar_Plot <- ggplot(bar_long, aes(x = Month, y = Songs, fill = Category)) +
+  geom_col(
+    position = position_dodge(width = 0.75),
+    width = 0.65,
+    colour = "black",
+    linewidth = 0.3 ) +
+  scale_fill_manual(values = c(
+    "Actual Number of Songs" = "#A8D5BA",
+    "Songs Detected by BirdNET" = "#A7C7E7" )) +
+  scale_y_continuous(
+    limits = c(0, 900),
+    breaks = seq(0, 900, 100),
+    expand = expansion(mult = c(0, 0.02)) ) +
+  labs(title = "Actual Number of Songs vs Songs Detected by BirdNET",
+    x = "Month",
+    y = "Number of Songs",
+    fill = NULL) +
+  theme_classic(base_size = 14) +
+  theme( plot.title = element_text(hjust = 0.5, face = "bold", size = 15),
+    axis.title = element_text(face = "bold"),
+    axis.text = element_text(colour = "black"),
+    legend.position = "top",
+    legend.text = element_text(size = 11))
+print(Bar_Plot)
+```
+
+

@@ -1,0 +1,340 @@
+---
+title: "NF-Focal"
+author: "Helly"
+date: "2026-11-26"
+output: html_document
+---
+
+---
+title: "NF-Focal"
+author: "Helly"
+date: "2026-11-26"
+output: word_document
+---
+
+```{r}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(lme4)
+
+Song_level <- read_csv("Song_level.csv")
+Note_level <- read_csv("Note_level.csv")
+
+
+# Total number of songs and notes for each focal individuals
+
+individual_summary <- full_join(
+  Song_level %>% count(Individual_ID, name = "Total_Songs"),
+  Note_level %>% count(Individual_ID, name = "Total_Notes"),
+  by = "Individual_ID")
+print(individual_summary)
+
+```
+
+
+
+```{r}
+# Song-level PCA plot with 95% ellipses
+
+feature_names <- c(
+  "Minimum_F0", "Maximum_F0", "Delta_F0", "Mean_centre_F0",
+  "Peak_F0", "Song_duration", "Note_count", "Note_pace")
+
+# Prepare data
+pca_data <- Song_level %>%
+  dplyr::select(Sex, Individual_ID, dplyr::all_of(feature_names)) %>%
+  dplyr::filter(dplyr::if_all(dplyr::all_of(feature_names), ~ !is.na(.x)))
+
+# Run PCA
+pca_res <- prcomp(pca_data[, feature_names], center = TRUE, scale. = TRUE)
+var_explained <- round(100 * summary(pca_res)$importance[2, 1:2], 1)
+
+# PCA scores
+pca_scores <- data.frame(
+  PC1 = pca_res$x[, 1],
+  PC2 = pca_res$x[, 2],
+  Individual_ID = factor(pca_data$Individual_ID),
+  Sex = pca_data$Sex)
+
+# Colours and legend labels
+individual_colours <- c(
+  "F1" = "#E6863B",
+  "F2" = "#D99AB7",
+  "M1" = "#3D9BCB",
+  "M2" = "#3CB695")
+
+individual_counts <- table(pca_scores$Individual_ID)
+
+individual_labels <- c(
+  "F1" = paste0("F1 (Female, N = ", individual_counts["F1"], ")"),
+  "F2" = paste0("F2 (Female, N = ", individual_counts["F2"], ")"),
+  "M1" = paste0("M1 (Male, N = ", individual_counts["M1"], ")"),
+  "M2" = paste0("M2 (Male, N = ", individual_counts["M2"], ")"))
+
+# Plot
+Song_pca <- ggplot(pca_scores, aes(PC1, PC2, colour = Individual_ID, shape = Individual_ID)) +
+  geom_point(size = 2.8, alpha = 0.75) +
+  stat_ellipse(aes(group = Individual_ID), type = "t", level = 0.95, linewidth = 0.8) +
+  scale_colour_manual(name = "Individual", values = individual_colours, labels = individual_labels) +
+  scale_shape_manual(name = "Individual", values = c("F1" = 15, "F2" = 15, "M1" = 16, "M2" = 16), labels = individual_labels) +
+  labs(
+    title = "PCA of Song-level Acoustic Features",
+    x = paste0("PC1 (", var_explained[1], "%)"),
+    y = paste0("PC2 (", var_explained[2], "%)")
+  ) +
+  theme_bw(base_size = 14) +
+  theme(
+    panel.border = element_rect(colour = "black", fill = NA, linewidth = 1),
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+    axis.title = element_text(face = "bold"),
+    axis.text = element_text(colour = "black"),
+    legend.position = "right" )
+
+print(Song_pca)
+```
+
+
+
+```{r}
+# Note-level PCA with 95% ellipses
+
+feature_names <- c(
+  "Minimum_F0", "Maximum_F0", "Delta_F0", "Peak_F0",
+  "Mean_centre_F0", "Note_duration")
+
+# Prepare data
+pca_data <- Note_level %>%
+  dplyr::select(Sex, Individual_ID, dplyr::all_of(feature_names)) %>%
+  dplyr::filter(dplyr::if_all(dplyr::all_of(feature_names), ~ !is.na(.x)))
+
+# Run PCA
+pca_res <- prcomp(pca_data[, feature_names], center = TRUE, scale. = TRUE)
+
+var_explained <- round(100 * summary(pca_res)$importance[2, 1:2], 1)
+
+# PCA scores
+pca_scores <- data.frame(
+  PC1 = pca_res$x[, 1],
+  PC2 = pca_res$x[, 2],
+  Individual_ID = factor(pca_data$Individual_ID),
+  Sex = pca_data$Sex)
+
+# Colours and legend labels
+individual_colours <- c(
+  "F1" = "#E6863B",
+  "F2" = "#D99AB7",
+  "M1" = "#3D9BCB",
+  "M2" = "#3CB695")
+
+individual_counts <- table(pca_scores$Individual_ID)
+
+individual_labels <- c(
+  "F1" = paste0("F1 (Female, N = ", individual_counts["F1"], ")"),
+  "F2" = paste0("F2 (Female, N = ", individual_counts["F2"], ")"),
+  "M1" = paste0("M1 (Male, N = ", individual_counts["M1"], ")"),
+  "M2" = paste0("M2 (Male, N = ", individual_counts["M2"], ")"))
+
+# Plot
+Note_pca <- ggplot(pca_scores, aes(PC1, PC2, colour = Individual_ID, shape = Individual_ID)) +
+  geom_point(size = 2.8, alpha = 0.75) +
+  stat_ellipse(aes(group = Individual_ID), type = "t", level = 0.95, linewidth = 0.8) +
+  scale_colour_manual(name = "Individual", values = individual_colours, labels = individual_labels) +
+  scale_shape_manual(name = "Individual", values = c("F1" = 15, "F2" = 15, "M1" = 16, "M2" = 16), labels = individual_labels) +
+  labs(
+    title = "PCA of Note-level Acoustic Features",
+    x = paste0("PC1 (", var_explained[1], "%)"),
+    y = paste0("PC2 (", var_explained[2], "%)")) +
+  theme_bw(base_size = 14) +
+  theme(
+    panel.border = element_rect(colour = "black", fill = NA, linewidth = 1),
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+    axis.title = element_text(face = "bold"),
+    axis.text = element_text(colour = "black"),
+    legend.position = "right" )
+print(Note_pca)
+```
+
+
+
+```{r}
+# Song-level Acoustic Parameters (violine plot)
+
+# Prepare data
+plot_data <- Song_level %>%
+  dplyr::select(
+    Individual_ID,
+    Minimum_F0, Maximum_F0, Delta_F0, Mean_centre_F0,
+    Peak_F0, Song_duration, Note_count, Note_pace ) %>%
+  tidyr::drop_na()
+
+# Convert to long format
+plot_data_long <- plot_data %>%
+  tidyr::pivot_longer(
+    cols = -Individual_ID,
+    names_to = "Feature",
+    values_to = "Value")
+
+# Set figure sequence
+plot_data_long$Feature <- factor(
+  plot_data_long$Feature,
+  levels = c(
+    "Minimum_F0", "Maximum_F0", "Delta_F0", "Mean_centre_F0",
+    "Peak_F0", "Song_duration", "Note_count", "Note_pace"))
+
+# Individual colours
+individual_colours <- c(
+  "F1" = "#D55E00",
+  "F2" = "#CC79A7",
+  "M1" = "#0072B2",
+  "M2" = "#009E73")
+
+# Violin plots
+Song_Violine_Plot <- ggplot(plot_data_long,
+            aes(x = Individual_ID, y = Value, fill = Individual_ID)) +
+  geom_violin(trim = FALSE, scale = "width", colour = "black", linewidth = 0.3) +
+  geom_boxplot(width = 0.12, fill = "white", outlier.shape = NA, linewidth = 0.3) +
+  geom_jitter(aes(colour = Individual_ID), width = 0.12, size = 0.6, alpha = 0.5,
+              show.legend = FALSE) +
+  facet_wrap(~Feature, scales = "free_y", ncol = 3) +
+  scale_fill_manual(values = individual_colours, name = "Individual") +
+  scale_colour_manual(values = individual_colours, guide = "none") +
+  labs(x = "Individual", y = "Acoustic measurements") +
+  theme_bw() +
+  theme(
+    strip.background = element_rect(fill = "grey90", colour = "black"),
+    strip.text = element_text(face = "bold", size = 10),
+    axis.title = element_text(face = "bold", size = 11),
+    axis.text = element_text(size = 9),
+    panel.spacing = unit(1, "lines"),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank() )
+print(Song_Violine_Plot)
+```
+
+
+
+```{r}
+# Note-level Acoustic Parameters (violin plot)
+
+# Prepare data
+plot_data <- Note_level %>%
+  dplyr::select(
+    Individual_ID,
+    Minimum_F0, Maximum_F0, Delta_F0, Peak_F0,
+    Mean_centre_F0, Note_duration ) %>%
+  tidyr::drop_na()
+
+# Convert to long format
+plot_data_long <- plot_data %>%
+  tidyr::pivot_longer(
+    cols = -Individual_ID,
+    names_to = "Feature",
+    values_to = "Value" )
+
+# Set figure sequence
+plot_data_long$Feature <- factor(
+  plot_data_long$Feature,
+  levels = c(
+    "Minimum_F0", "Maximum_F0", "Delta_F0",
+    "Peak_F0", "Mean_centre_F0", "Note_duration"))
+
+# Individual colours
+individual_colours <- c(
+  "F1" = "#D55E00",
+  "F2" = "#CC79A7",
+  "M1" = "#0072B2",
+  "M2" = "#009E73")
+
+# Violin plots
+Note_Violine_Plot <- ggplot(plot_data_long,
+            aes(x = Individual_ID, y = Value, fill = Individual_ID)) +
+  geom_violin(trim = FALSE, scale = "width", colour = "black", linewidth = 0.3) +
+  geom_boxplot(width = 0.12, fill = "white", outlier.shape = NA, linewidth = 0.3) +
+  geom_jitter(aes(colour = Individual_ID), width = 0.12, size = 0.6, alpha = 0.5,
+              show.legend = FALSE) +
+  facet_wrap(~Feature, scales = "free_y", ncol = 3) +
+  scale_fill_manual(values = individual_colours, name = "Individual") +
+  scale_colour_manual(values = individual_colours, guide = "none") +
+  labs(x = "Individual", y = "Acoustic measurements") +
+  theme_bw() +
+  theme(
+    strip.background = element_rect(fill = "grey90", colour = "black"),
+    strip.text = element_text(face = "bold", size = 10),
+    axis.title = element_text(face = "bold", size = 11),
+    axis.text = element_text(size = 9),
+    panel.spacing = unit(1, "lines"),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank())
+print(Note_Violine_Plot)
+```
+
+
+
+```{r}
+# 2.2 Method - Linear Mixed-Effects Model (LMM) Analysis
+
+
+model1 <- lmer(Minimum_F0 ~ Sex + (1 | Individual_ID), data = Song_level)
+model2 <- lmer(Maximum_F0 ~ Sex + (1 | Individual_ID), data = Song_level)
+model3 <- lmer(Delta_F0 ~ Sex + (1 | Individual_ID), data = Song_level)
+model4 <- lmer(Peak_F0 ~ Sex + (1 | Individual_ID), data = Song_level)
+model5 <- lmer(Mean_centre_F0 ~ Sex + (1 | Individual_ID), data = Song_level)
+model6 <- lmer(Song_duration ~ Sex + (1 | Individual_ID), data = Song_level)
+model7 <- lmer(Note_count ~ Sex + (1 | Individual_ID), data = Song_level)
+model8 <- lmer(Note_pace ~ Sex + (1 | Individual_ID), data = Song_level)
+
+summary(model1)
+summary(model2)
+summary(model3)
+summary(model4)
+summary(model5)
+summary(model6)
+summary(model7)
+summary(model8)
+
+
+model21 <- lmer(Minimum_F0 ~ Sex + (1 | Individual_ID/Song_ID), data = Note_level)
+model22 <- lmer(Maximum_F0 ~ Sex + (1 | Individual_ID/Song_ID), data = Note_level)
+model23 <- lmer(Delta_F0 ~ Sex + (1 | Individual_ID/Song_ID), data = Note_level)
+model24 <- lmer(Peak_F0 ~ Sex + (1 | Individual_ID/Song_ID), data = Note_level)
+model25 <- lmer(Mean_centre_F0 ~ Sex + (1 | Individual_ID/Song_ID), data = Note_level)
+model26 <- lmer(Note_duration ~ Sex + (1 | Individual_ID/Song_ID), data = Note_level)
+
+summary(model21)
+summary(model22)
+summary(model23)
+summary(model24)
+summary(model25)
+summary(model26)
+
+
+# 95% Confidence intervals
+
+get_CI <- function(model) {
+  estimate <- fixef(model)["SexMale"]
+  SE <- sqrt(vcov(model)["SexMale", "SexMale"])
+  c( Lower_CI = estimate - 1.96 * SE,
+    Upper_CI = estimate + 1.96 * SE)}
+
+# Song-level 95% CI
+get_CI(model1)
+get_CI(model2)
+get_CI(model3)
+get_CI(model4)
+get_CI(model5)
+get_CI(model6)
+get_CI(model7)
+get_CI(model8)
+
+# Note-level 95% CI
+get_CI(model21)
+get_CI(model22)
+get_CI(model23)
+get_CI(model24)
+get_CI(model25)
+get_CI(model26)
+
+```
+
