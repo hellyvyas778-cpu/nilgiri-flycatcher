@@ -1,3 +1,0 @@
-Selection	View	Channel	Begin Path	Begin Time (s)	End Time (s)	Delta Time (s)	Low Freq (Hz)	High Freq (Hz)	Delta Freq (Hz)	Peak Freq (Hz)	Center Freq (Hz)	BW 50% (Hz)	BW 90% (Hz)	Freq 5% (Hz)	Freq 25% (Hz)	Freq 75% (Hz)	Freq 95% (Hz)	Species Code
-1	Spectrogram 1	1	G:\Nilgiri Flycatcher\CC-M-F\05-NF-Testing-ARU\Female-NFCNESTKODI_20250331_170000.wav	160.532328785	164.140753790	3.6084	2325.6	4091.3	1765.723	3437.500	3375.000	312.500	687.500	2875.000	3187.500	3500.000	3562.500	Female
-2	Spectrogram 1	1	G:\Nilgiri Flycatcher\CC-M-F\05-NF-Testing-ARU\Female-NFCNESTKODI_20250331_170000.wav	228.461405447	232.598814221	4.1374	2067.2	4091.3	2024.122	3187.500	3062.500	750.000	1687.500	2187.500	2562.500	3312.500	3875.000	
